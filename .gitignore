@@ -3,4 +3,6 @@ devel
 logs
 .vscode
 .catkin_tools
+.DS_Store
 FC-Planner/FC-Planner/src/hierarchical_coverage_planner/solution/LKH/OBJ/*
+FC-Planner/__pycache__/*

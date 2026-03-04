@@ -1,0 +1,262 @@
+<launch>
+  <!-- 场景名注释，仅用于阅读 -->
+  <!-- SCENE : Jet -->
+
+  <!-- ===== 全局参数（arg）：可被下方多个 param 复用 ===== -->
+  <!-- 相机垂直视场角（单位：度），按你的相机填写 -->
+  <arg name="fov_h" value="55.0"/>
+  <!-- 相机水平视场角（单位：度），按你的相机填写 -->
+  <arg name="fov_w" value="75.0"/>
+  <!-- 相机主点 x（像素），按你的相机内参填写 -->
+  <arg name="cx" value="320.0"/>
+  <!-- 相机主点 y（像素），按你的相机内参填写 -->
+  <arg name="cy" value="240.0"/>
+  <!-- 相机焦距 fx（像素），按你的相机内参填写 -->
+  <arg name="fx" value="417.0467"/>
+  <!-- 相机焦距 fy（像素），按你的相机内参填写 -->
+  <arg name="fy" value="461.0951"/>
+  <!-- 最大可见距离（米），按任务与相机能力填写 -->
+  <arg name="max_dist" value="11.0"/>
+  <!-- 地图/规划基础分辨率（米），常用 0.2~0.6，越小越精细但更慢 -->
+  <arg name="resolution_" value="0.4"/>
+  <!-- 最大速度（m/s），按飞行平台能力填写 -->
+  <arg name="max_vel" value="2.0"/>
+  <!-- 最大加速度（m/s^2），按飞行平台能力填写 -->
+  <arg name="max_acc" value="1.0"/>
+  <!-- 最大加加速度（m/s^3），按飞行平台能力填写 -->
+  <arg name="max_jerk" value="0.5"/>
+  <!-- 最大偏航角速度（deg/s），按飞行平台能力填写 -->
+  <arg name="max_yd" value="60.0"/>
+  <!-- 最大偏航角加速度（deg/s^2），按飞行平台能力填写 -->
+  <arg name="max_ydd" value="30.0"/>
+  <!-- 机体碰撞半径（米），按机体外接球半径填写 -->
+  <arg name="drone_radius" value="0.3"/>
+
+  <!--
+    启动主节点
+    pkg: ROS 包名
+    name: 节点名
+    type: 可执行文件名
+    output: 输出到终端
+    required: 节点退出时同时结束 launch
+  -->
+  <node pkg="hierarchical_coverage_planner" name="hcplanner_exec" type="hcplanner_exec" output="screen" required="true">
+
+    <!-- ===== Skeleton-based Space Decomposition（ROSA 骨架分解）===== -->
+    <!-- 法向估计采样点数，越大越稳定但更慢 -->
+    <param name="rosa_main/estimation_num" value="1000" type="int"/>
+    <!-- 骨架分解输入点云（pcd） -->
+    <param name="rosa_main/pcd" value="$(find hierarchical_coverage_planner)/data/jet.pcd" type="string"/>
+    <!-- ROSA 邻域半径（米） -->
+    <param name="rosa_main/radius" value="0.1" type="double"/>
+    <!-- 马氏距离阈值 -->
+    <param name="rosa_main/th_mah" value="0.01" type="double"/>
+    <!-- 迭代步长参数 -->
+    <param name="rosa_main/delta" value="0.01" type="double"/>
+    <!-- DROSA 迭代次数 -->
+    <param name="rosa_main/num_drosa" value="5" type="int"/>
+    <!-- DCROSA 迭代次数 -->
+    <param name="rosa_main/num_dcrosa" value="2" type="int"/>
+    <!-- KNN 邻居数量 -->
+    <param name="rosa_main/k_KNN" value="6" type="int"/>
+    <!-- 重采样半径 -->
+    <param name="rosa_main/sample_r" value="0.05" type="double"/>
+    <!-- 重心回缩系数 -->
+    <param name="rosa_main/alpha" value="0.3" type="double"/>
+    <!-- ROSA 输入点云体素降采样尺寸 -->
+    <param name="rosa_main/pt_downsample_size" value="0.02" type="double"/>
+    <!-- 法向估计邻居数 -->
+    <param name="rosa_main/estimation_number" value="10" type="int"/>
+    <!-- 内部分解角度上限（度） -->
+    <param name="rosa_main/upper_bound_angle_inner_decomp" value="45.0" type="double"/>
+    <!-- 内部分解长度上限（米） -->
+    <param name="rosa_main/upper_bound_length_inner_decomp" value="1.0" type="double"/>
+    <!-- 是否进行骨架剪枝 -->
+    <param name="rosa_main/Prune" value="true" type="bool"/>
+    <!-- 剪枝长度下限（米） -->
+    <param name="rosa_main/lower_bound_length" value="0.2" type="double"/>
+    <!-- 剪枝角度下限（度） -->
+    <param name="rosa_main/lower_bound_prune_angle" value="75.0" type="double"/>
+    <!-- 原始点数上限（超过则触发处理策略） -->
+    <param name="rosa_main/upper_bound_original_points_num" value="10000" type="int"/>
+    <!-- 是否启用地面约束 -->
+    <param name="rosa_main/Ground" value="false" type="bool"/>
+
+    <!-- ===== Mapping（占据地图/SDF 参数）===== -->
+    <!-- 地图分辨率（来自全局 arg） -->
+    <param name="hcmap/resolution" value="$(arg resolution_)" type="double"/>
+    <!-- 投影间隔 -->
+    <param name="hcmap/interval" value="1.0" type="double"/>
+    <!-- 平面厚度（米） -->
+    <param name="hcmap/plane_thickness" value="3.0" type="double"/>
+    <!-- 膨胀半径（米） -->
+    <param name="hcmap/dilateRadius" value="0.5" type="double"/>
+    <!-- 碰撞检查尺度系数 -->
+    <param name="hcmap/checkScale" value="5.0" type="double"/>
+    <!-- 碰撞检查窗口大小（体素） -->
+    <param name="hcmap/checkSize" value="5" type="int"/>
+    <!-- 栅格膨胀层数（体素） -->
+    <param name="hcmap/inflateVoxel" value="3" type="int"/>
+
+    <!-- ===== Perception（可见性模型）===== -->
+    <!-- 相机上半视角（弧度），由 fov_h 转换 -->
+    <param name="perception_utils/top_angle" value="$(eval arg('fov_h')*3.1415926/360.0)" type="double"/>
+    <!-- 相机左半视角（弧度），由 fov_w 转换 -->
+    <param name="perception_utils/left_angle" value="$(eval arg('fov_w')*3.1415926/360.0)" type="double"/>
+    <!-- 相机右半视角（弧度），由 fov_w 转换 -->
+    <param name="perception_utils/right_angle" value="$(eval arg('fov_w')*3.1415926/360.0)" type="double"/>
+    <!-- 最大可见距离（米） -->
+    <param name="perception_utils/max_dist" value="$(arg max_dist)" type="double"/>
+    <!-- 近距离可见阈值（米） -->
+    <param name="perception_utils/vis_dist" value="3.0" type="double"/>
+
+    <!-- ===== Path Searching（A*）===== -->
+    <!-- 启发式权重 -->
+    <param name="astar/lambda_heu_hc" value="10.0" type="double"/>
+    <!-- A* 栅格分辨率（通常与地图分辨率一致） -->
+    <param name="astar/resolution_astar" value="$(arg resolution_)" type="double"/>
+    <!-- 预分配节点数 -->
+    <param name="astar/allocate_num" value="1000000" type="int"/>
+    <!-- 单次搜索最大时长（秒） -->
+    <param name="astar/max_search_time" value="0.005" type="double"/>
+    <!-- 路径搜索采样步长（米） -->
+    <param name="astar/searching_res" value="0.4" type="double"/>
+
+    <!-- ===== Hierarchical Coverage Planner（主规划器）===== -->
+    <!-- 模型网格（obj/dae），用于法向与视点几何 -->
+    <param name="hcplanner/mesh" value="$(find hierarchical_coverage_planner)/data/mesh/jet.obj" type="string"/>
+    <!-- 更完整点云（pcd），用于建图与覆盖评估 -->
+    <param name="hcplanner/fullcloud" value="$(find hierarchical_coverage_planner)/data/jetmore.pcd" type="string"/>
+    <!-- 网格降采样尺寸（米） -->
+    <param name="hcplanner/model_downsample_size" value="2.0" type="double"/>
+    <!-- 安全内缩系数 -->
+    <param name="hcplanner/safe_inner_dist_coeff" value="1.1" type="double"/>
+    <!-- 相机内参 cx（像素） -->
+    <param name="hcplanner/cx" value="$(arg cx)" type="double"/>
+    <!-- 相机内参 cy（像素） -->
+    <param name="hcplanner/cy" value="$(arg cy)" type="double"/>
+    <!-- 相机内参 fx（像素） -->
+    <param name="hcplanner/fx" value="$(arg fx)" type="double"/>
+    <!-- 相机内参 fy（像素） -->
+    <param name="hcplanner/fy" value="$(arg fy)" type="double"/>
+    <!-- 是否启用云台三脚架模式 -->
+    <param name="hcplanner/tripod_head" value="false" type="bool"/>
+    <!-- 法向采样步长 -->
+    <param name="hcplanner/sample_step4normal" value="1.0" type="double"/>
+    <!-- 初始位置 x（米） -->
+    <param name="hcplanner/current_x_" value="0.0" type="double"/>
+    <!-- 初始位置 y（米） -->
+    <param name="hcplanner/current_y_" value="0.0" type="double"/>
+    <!-- 初始位置 z（米） -->
+    <param name="hcplanner/current_z_" value="0.0" type="double"/>
+    <!-- 执行模式：debug 或 release -->
+    <param name="hcplanner/exec_mode" value="release" type="string"/>
+
+    <!-- ===== Viewpoint Manager（视点生成）===== -->
+    <!-- 视点可见半径（米），通常等于 max_dist -->
+    <param name="viewpoint_manager/visible_range" value="$(arg max_dist)" type="double"/>
+    <!-- 相邻视点典型间距（米） -->
+    <param name="viewpoint_manager/viewpoints_distance" value="8.0" type="double"/>
+    <!-- 视场角 h（度） -->
+    <param name="viewpoint_manager/fov_h" value="$(arg fov_h)" type="double"/>
+    <!-- 视场角 w（度） -->
+    <param name="viewpoint_manager/fov_w" value="$(arg fov_w)" type="double"/>
+    <!-- 俯仰上限（度） -->
+    <param name="viewpoint_manager/pitch_upper" value="70.0" type="double"/>
+    <!-- 俯仰下限（度） -->
+    <param name="viewpoint_manager/pitch_lower" value="-85.0" type="double"/>
+    <!-- 是否启用地面约束 -->
+    <param name="viewpoint_manager/zGround" value="false" type="bool"/>
+    <!-- 地面高度 z（米） -->
+    <param name="viewpoint_manager/GroundPos" value="-7.4" type="double"/>
+    <!-- 最低安全高度（米） -->
+    <param name="viewpoint_manager/safeHeight" value="1.5" type="double"/>
+    <!-- 离模型安全半径（米） -->
+    <param name="viewpoint_manager/safe_radius" value="3.0" type="double"/>
+    <!-- 姿态类型：yaw 或 all(同时优化 pitch,yaw) -->
+    <param name="viewpoint_manager/attitude_type" value="all" type="string"/>
+    <!-- 姿态更新最大迭代次数 -->
+    <param name="viewpoint_manager/max_iter_num" value="5" type="int"/>
+    <!-- 是否更新姿态 -->
+    <param name="viewpoint_manager/pose_update" value="true" type="bool"/>
+    <!-- 机体半径（米）：hctraj.cpp 读取的是这个字段，建议与 drone_radius 一致 -->
+    <param name="viewpoint_manager/drone_radius" value="$(arg drone_radius)" type="double"/>
+
+    <!-- ===== Path Solver（全局/局部 TSP 求解）===== -->
+    <!-- 代价缩放精度 -->
+    <param name="hcplanner/precision_" value="100" type="int"/>
+    <!-- LKH 可执行目录 -->
+    <param name="hcplanner/global_solver" value="$(find hierarchical_coverage_planner)/solution/LKH" type="string"/>
+    <!-- 全局求解参数文件路径 -->
+    <param name="hcplanner/global_par_file" value="$(find hierarchical_coverage_planner)/solution/global/global.par" type="string"/>
+    <!-- 全局 TSP 问题文件输出路径 -->
+    <param name="hcplanner/global_problem_file" value="$(find hierarchical_coverage_planner)/solution/global/global.tsp" type="string"/>
+    <!-- 全局 TSP 结果文件输出路径 -->
+    <param name="hcplanner/global_result_file" value="$(find hierarchical_coverage_planner)/solution/global/global.txt" type="string"/>
+    <!-- 全局 LKH 运行次数 -->
+    <param name="hcplanner/global_runs" value="1" type="int"/>
+    <!-- 局部求解临时文件夹 -->
+    <param name="hcplanner/local_folder" value="$(find hierarchical_coverage_planner)/solution/local" type="string"/>
+    <!-- 局部 LKH 运行次数 -->
+    <param name="hcplanner/local_runs" value="1" type="int"/>
+    <!-- 最大速度（m/s） -->
+    <param name="hcplanner/vmax_" value="$(arg max_vel)" type="double"/>
+    <!-- 最大加速度（m/s^2） -->
+    <param name="hcplanner/amax_" value="$(arg max_acc)" type="double"/>
+    <!-- 最大加加速度（m/s^3） -->
+    <param name="hcplanner/jmax_" value="$(arg max_jerk)" type="double"/>
+    <!-- 最大偏航角速度（rad/s） -->
+    <param name="hcplanner/ydmax_" value="$(eval arg('max_yd')*3.1415926/180.0)" type="double"/>
+    <!-- 最大偏航角加速度（rad/s^2） -->
+    <param name="hcplanner/yddmax_" value="$(eval arg('max_ydd')*3.1415926/180.0)" type="double"/>
+    <!-- 关节/转折半径系数 -->
+    <param name="hcplanner/JointRadius" value="2.0" type="double"/>
+    <!-- 局部 2-opt 优化尝试次数 -->
+    <param name="hcplanner/local2opt_trial" value="3000" type="int"/>
+
+    <!-- ===== Trajectory Generation（轨迹优化与导出）===== -->
+    <!-- 机体半径（米） -->
+    <param name="hctraj/drone_radius" value="$(arg drone_radius)" type="double"/>
+    <!-- 最大速度（m/s） -->
+    <param name="hctraj/vmax_" value="$(arg max_vel)" type="double"/>
+    <!-- 最大加速度（m/s^2） -->
+    <param name="hctraj/amax_" value="$(arg max_acc)" type="double"/>
+    <!-- 最大加加速度（m/s^3） -->
+    <param name="hctraj/jmax_" value="$(arg max_jerk)" type="double"/>
+    <!-- 最大偏航角速度（rad/s） -->
+    <param name="hctraj/ydmax_" value="$(eval arg('max_yd')*3.1415926/180.0)" type="double"/>
+    <!-- 轨迹优化时间项权重 -->
+    <param name="hctraj/rho_T" value="500.0" type="double"/>
+    <!-- 轨迹优化 jerk 权重 -->
+    <param name="hctraj/rho_j" value="800.0" type="double"/>
+    <!-- 轨迹优化加速度权重 -->
+    <param name="hctraj/rho_a" value="800.0" type="double"/>
+    <!-- 轨迹优化速度权重 -->
+    <param name="hctraj/rho_v" value="800.0" type="double"/>
+    <!-- 轨迹优化位置权重 -->
+    <param name="hctraj/rho_p" value="800.0" type="double"/>
+    <!-- 轨迹优化高度项权重 -->
+    <param name="hctraj/rho_z" value="2000.0" type="double"/>
+    <!-- 轨迹优化终端项权重 -->
+    <param name="hctraj/rho_e" value="500.0" type="double"/>
+    <!-- 离散轨迹输出文件 -->
+    <param name="hctraj/TrajFile" value="$(find hierarchical_coverage_planner)/solution/Traj/TrajInfoJet.txt" type="string"/>
+    <!-- 可见点云时序输出文件 -->
+    <param name="hctraj/CloudFile" value="$(find hierarchical_coverage_planner)/solution/Traj/CloudInfoJet.txt" type="string"/>
+    <!-- 位置多项式系数输出文件 -->
+    <param name="hctraj/PosFile" value="$(find hierarchical_coverage_planner)/solution/Traj/PositionCoeffJet.txt" type="string"/>
+    <!-- 俯仰多项式系数输出文件 -->
+    <param name="hctraj/PitchFile" value="$(find hierarchical_coverage_planner)/solution/Traj/PitchCoeffJet.txt" type="string"/>
+    <!-- 偏航多项式系数输出文件 -->
+    <param name="hctraj/YawFile" value="$(find hierarchical_coverage_planner)/solution/Traj/YawCoeffJet.txt" type="string"/>
+
+    <!-- ===== FC-Planner 主流程 ===== -->
+    <!-- 时间戳相关参数（内部流程使用） -->
+    <param name="hcopp/TimeStamp" value="0.3" type="double"/>
+    <!-- 轨迹离散采样间隔（秒），越小导出越密 -->
+    <param name="hcopp/TrajSampleFrequency" value="0.1" type="double"/>
+    <!-- 可视化无人机网格模型 -->
+    <param name="hcopp/droneMesh" value="$(find traj_utils)/f250.dae" type="string"/>
+  </node>
+
+</launch>

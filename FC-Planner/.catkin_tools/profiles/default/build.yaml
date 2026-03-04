@@ -4,6 +4,8 @@ build_space: build
 catkin_make_args: []
 cmake_args:
 - -DCMAKE_BUILD_TYPE=Release
+- -DCMAKE_C_COMPILER_LAUNCHER=ccache
+- -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 devel_layout: linked
 devel_space: devel
 extend_path: null

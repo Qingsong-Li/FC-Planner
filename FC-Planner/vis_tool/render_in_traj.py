@@ -326,9 +326,9 @@ def main():
     raw_args = sys.argv[1 :]
     parser = argparse.ArgumentParser()
     # ! modify the path of the model and trajectory
-    parser.add_argument("--model_path", type=str,default='assets/model/MBS.obj')
-    parser.add_argument("--traj_path", type=str,default='assets/TrajInfo.txt')
-    parser.add_argument("--renderout_path", type=str,default='assets/test/')
+    parser.add_argument("--model_path", type=str,default='/home/liqingsong/Desktop/FC-Planner/FC-Planner/vis_tool/assets/model/MBS.obj')
+    parser.add_argument("--traj_path", type=str,default='/home/liqingsong/Desktop/FC-Planner/FC-Planner/src/hierarchical_coverage_planner/solution/Traj/TrajInfoMBS.txt')
+    parser.add_argument("--renderout_path", type=str,default='/home/liqingsong/Desktop/fcplanner_render/')
     parser.add_argument("--backend", type=str, default="BLENDER_EEVEE")
     parser.add_argument("--light_mode", type=str, default="uniform")
     parser.add_argument("--fast_mode", action="store_true")
