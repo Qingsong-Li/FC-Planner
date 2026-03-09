@@ -1,0 +1,132 @@
+# Blender 3.6.23 MTL File: 'None'
+# www.blender.org
+
+newmtl Asphalt_New.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Asphalt_New.jpg
+
+newmtl Brick_Antique.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Brick_Antique.jpg
+
+newmtl Brick_Basket_Two.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Brick_Basket_Two.jpg
+
+newmtl Color_002.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Color_002.jpg
+
+newmtl Color_006.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Color_006.jpg
+
+newmtl Google_Earth_Snapshot_1.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Google_Earth_Snapshot_1.jpg
+
+newmtl M_01.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/M_01.jpg
+
+newmtl _1.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_1.jpg
+
+newmtl _2.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_2.jpg
+
+newmtl _3.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_3.jpg
+
+newmtl _4.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_4.jpg
+
+newmtl _6.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_6.jpg
+
+newmtl _7.002
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_7.jpg
