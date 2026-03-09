@@ -1,7 +1,7 @@
 # Blender 3.6.23 MTL File: 'None'
 # www.blender.org
 
-newmtl Asphalt_New.002
+newmtl Asphalt_New
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -9,9 +9,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Asphalt_New.jpg
+map_Kd Eiffel+Tower/Asphalt_New.jpg
 
-newmtl Brick_Antique.002
+newmtl Brick_Antique
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -19,9 +19,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Brick_Antique.jpg
+map_Kd Eiffel+Tower/Brick_Antique.jpg
 
-newmtl Brick_Basket_Two.002
+newmtl Brick_Basket_Two
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -29,9 +29,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Brick_Basket_Two.jpg
+map_Kd Eiffel+Tower/Brick_Basket_Two.jpg
 
-newmtl Color_002.002
+newmtl Color_002
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -39,9 +39,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Color_002.jpg
+map_Kd Eiffel+Tower/Color_002.jpg
 
-newmtl Color_006.002
+newmtl Color_006
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -49,9 +49,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Color_006.jpg
+map_Kd Eiffel+Tower/Color_006.jpg
 
-newmtl Google_Earth_Snapshot_1.002
+newmtl Google_Earth_Snapshot_1
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -59,9 +59,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/Google_Earth_Snapshot_1.jpg
+map_Kd Eiffel+Tower/Google_Earth_Snapshot_1.jpg
 
-newmtl M_01.002
+newmtl M_01
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -69,9 +69,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/M_01.jpg
+map_Kd Eiffel+Tower/M_01.jpg
 
-newmtl _1.002
+newmtl _1
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -79,9 +79,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_1.jpg
+map_Kd Eiffel+Tower/_1.jpg
 
-newmtl _2.002
+newmtl _2
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -89,9 +89,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_2.jpg
+map_Kd Eiffel+Tower/_2.jpg
 
-newmtl _3.002
+newmtl _3
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -99,9 +99,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_3.jpg
+map_Kd Eiffel+Tower/_3.jpg
 
-newmtl _4.002
+newmtl _4
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -109,9 +109,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_4.jpg
+map_Kd Eiffel+Tower/_4.jpg
 
-newmtl _6.002
+newmtl _6
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -119,9 +119,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_6.jpg
+map_Kd Eiffel+Tower/_6.jpg
 
-newmtl _7.002
+newmtl _7
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.330000 0.330000 0.330000
@@ -129,4 +129,4 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /Users/liqingsong/Desktop/Eiffel Tower/_7.jpg
+map_Kd Eiffel+Tower/_7.jpg
