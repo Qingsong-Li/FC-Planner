@@ -255,3 +255,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+#  python3 obj_to_pcd.py --obj FC-Planner/src/hierarchical_coverage_planner/data/mesh/kangaroo.obj --out-prefix kangaroo --out-dir FC-Planner/src/hierarchical_coverage_planner/data --full-points 500000 --rosa-voxel 0.05 --rosa-max-points 120000 && mv FC-Planner/src/hierarchical_coverage_planner/data/kangaroo_rosa.pcd FC-Planner/src/hierarchical_coverage_planner/data/kangaroo.pcd && mv FC-Planner/src/hierarchical_coverage_planner/data/kangaroo_fullcloud.pcd FC-Planner/src/hierarchical_coverage_planner/data/kangaroomore.pcd

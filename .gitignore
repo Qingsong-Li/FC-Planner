@@ -6,3 +6,4 @@ logs
 .DS_Store
 FC-Planner/FC-Planner/src/hierarchical_coverage_planner/solution/LKH/OBJ/*
 FC-Planner/__pycache__/*
+FC-Planner/vis_tool/result/*
