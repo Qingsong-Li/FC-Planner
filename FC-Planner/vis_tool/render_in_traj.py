@@ -390,7 +390,13 @@ def save_rendering_dataset(
 
 def main():
     """命令行入口：解析参数并触发渲染流程。"""
-    raw_args = sys.argv[1 :]
+    # Blender 自身参数在 `--` 之前，脚本参数在 `--` 之后。
+    # 例如：
+    # blender --background --python render_in_traj.py -- --model_path ... --traj_path ...
+    if "--" in sys.argv:
+        raw_args = sys.argv[sys.argv.index("--") + 1 :]
+    else:
+        raw_args = sys.argv[1 :]
     parser = argparse.ArgumentParser()
     # 默认路径请按本地环境修改
     parser.add_argument("--model_path", type=str,default='/Users/liqingsong/Desktop/毕设/FC-Planner/FC-Planner/vis_tool/assets/model/EiffelTower/EiffelTower.obj')
