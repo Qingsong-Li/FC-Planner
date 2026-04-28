@@ -7,3 +7,7 @@ logs
 FC-Planner/FC-Planner/src/hierarchical_coverage_planner/solution/LKH/OBJ/*
 FC-Planner/__pycache__/*
 FC-Planner/vis_tool/result/*
+FC-Planner/FC-Planner/src/hierarchical_coverage_planner/solution/*
+FC-Planner/src/hierarchical_coverage_planner/solution/Traj/*
+FC-Planner/src/hierarchical_coverage_planner/solution/local/*
+FC-Planner/src/hierarchical_coverage_planner/solution/global/*
