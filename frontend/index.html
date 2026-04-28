@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>无人机三维目标巡检视觉系统</title>
+  <link rel="stylesheet" href="/static/css/tokens.css" />
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/layout.css" />
+  <link rel="stylesheet" href="/static/css/components.css" />
+  <link rel="stylesheet" href="/static/css/responsive.css" />
+</head>
+<body>
+  <div class="bg-layer" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="topbar__brand">
+      <div class="brand-mark">UAV</div>
+      <div>
+        <h1 class="brand-title">无人机三维目标巡检视觉系统</h1>
+        <p class="brand-subtitle">上传模型，自动规划巡检路线，并按需生成可视化结果</p>
+      </div>
+    </div>
+    <div class="topbar__status">
+      <span id="globalStatusBadge" class="badge badge--idle">未开始</span>
+      <span id="jobIdentity" class="job-id">任务编号：--</span>
+    </div>
+  </header>
+
+  <div class="dashboard">
+    <aside class="sidebar">
+      <section class="panel panel--glass">
+        <h2 class="panel__title">流程导航</h2>
+        <ol class="step-list">
+          <li>上传 OBJ 与可选材质资源</li>
+          <li>填写巡检参数并启动任务</li>
+          <li>优先查看关键性能数据</li>
+          <li>按需生成第三人称或 FOV 视频</li>
+        </ol>
+      </section>
+
+      <section class="panel panel--glass">
+        <h2 class="panel__title">当前建议</h2>
+        <p id="nextAction" class="muted">请先上传 OBJ 文件并启动任务。</p>
+      </section>
+
+      <section class="panel panel--glass">
+        <h2 class="panel__title">状态说明</h2>
+        <ul class="legend-list">
+          <li><span class="dot dot--blue"></span>处理中</li>
+          <li><span class="dot dot--green"></span>已完成</li>
+          <li><span class="dot dot--orange"></span>等待操作</li>
+          <li><span class="dot dot--red"></span>异常/失败</li>
+        </ul>
+      </section>
+    </aside>
+
+    <main class="content">
+      <section class="panel">
+        <div class="panel__header">
+          <h2 class="panel__title">任务配置</h2>
+          <span class="panel__hint">带 * 的字段为必填</span>
+        </div>
+
+        <form id="jobForm" class="form" enctype="multipart/form-data" novalidate>
+          <div class="config-main">
+            <div class="config-fields">
+              <div class="form-grid">
+                <label class="field">
+                  <span class="field__label">OBJ 文件 *</span>
+                  <div class="file-picker">
+                    <input id="objFileInput" class="file-native" type="file" name="obj_file" accept=".obj" required />
+                    <label class="btn btn--ghost btn--sm file-trigger" for="objFileInput">选择 OBJ 文件</label>
+                    <span id="objFileName" class="file-name">未选择文件</span>
+                  </div>
+                  <span class="field__help">请上传单个 OBJ 模型文件。</span>
+                  <span class="field__error" id="objError"></span>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">MTL/材质文件（可选）</span>
+                  <div class="file-picker">
+                    <input id="assetFilesInput" class="file-native" type="file" name="asset_files" multiple />
+                    <label class="btn btn--ghost btn--sm file-trigger" for="assetFilesInput">选择材质文件</label>
+                    <span id="assetFilesName" class="file-name">未选择文件</span>
+                  </div>
+                  <span class="field__help">不上传也可运行，但会影响 FOV 显示效果。</span>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">材质文件夹（可选）</span>
+                  <div class="file-picker">
+                    <input id="assetDirInput" class="file-native" type="file" name="asset_dir_files" webkitdirectory directory multiple />
+                    <label class="btn btn--ghost btn--sm file-trigger" for="assetDirInput">选择材质文件夹</label>
+                    <span id="assetDirName" class="file-name">未选择文件夹</span>
+                  </div>
+                  <span class="field__help">建议上传完整材质目录，保证纹理正确。</span>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">场景名称 *</span>
+                  <input id="sceneNameInput" class="input" name="scene_name" value="webscene" required placeholder="例如：EiffelTower" />
+                  <span class="field__help">默认会自动使用 OBJ 文件名（不含后缀）。</span>
+                </label>
+
+                <label class="field"><span class="field__label">视角宽度</span><input class="input" name="fov_w" value="75.0" /></label>
+                <label class="field"><span class="field__label">视角高度</span><input class="input" name="fov_h" value="55.0" /></label>
+                <label class="field"><span class="field__label">最大观察距离</span><input class="input" name="max_dist" value="11.0" /></label>
+                <label class="field"><span class="field__label">飞行最大速度</span><input class="input" name="max_vel" value="5.0" /></label>
+                <label class="field"><span class="field__label">飞行最大加速度</span><input class="input" name="max_acc" value="1.0" /></label>
+                <label class="field"><span class="field__label">飞行最大转向速度</span><input class="input" name="max_yd" value="60.0" /></label>
+              </div>
+            </div>
+            <div class="model-preview-card">
+              <div class="model-preview-card__head">
+                <h3 class="sub-title">模型预览</h3>
+                <span class="badge badge--idle" id="objPreviewBadge">未加载</span>
+              </div>
+              <div class="preview-toolbar">
+                <label class="preview-tool">
+                  <span>背景</span>
+                  <select id="objBgSelect" class="input input--mini">
+                    <option value="dark" selected>深色</option>
+                    <option value="light">浅色</option>
+                    <option value="blue">蓝灰</option>
+                  </select>
+                </label>
+                <label class="preview-tool preview-tool--wide">
+                  <span>小灯光强度</span>
+                  <input id="objLightRange" type="range" min="0.2" max="2.0" step="0.1" value="1.0" />
+                </label>
+                <label class="preview-tool preview-tool--switch">
+                  <span>轨迹高亮</span>
+                  <input id="trajOverlayToggle" type="checkbox" disabled />
+                </label>
+              </div>
+              <div class="obj-canvas-wrap" id="objCanvasWrap">
+                <canvas id="objPreviewCanvas"></canvas>
+                <div id="objPreviewEmpty" class="empty-block">上传 OBJ 后可在此拖拽旋转查看模型。</div>
+              </div>
+              <div class="model-preview-actions">
+                <button id="resetObjViewBtn" type="button" class="btn btn--ghost btn--sm" disabled>重置视角</button>
+              </div>
+              <p id="objPreviewMeta" class="muted">操作提示：按住鼠标左键拖拽旋转，滚轮缩放。上传 MTL/材质后会显示材质效果。</p>
+            </div>
+          </div>
+
+          <details class="advanced" id="advancedPanel">
+            <summary>高级参数（展开后可微调算法行为）</summary>
+            <div class="form-grid advanced-grid">
+              <label class="field"><span class="field__label">cx（画面中心横向像素）</span><input class="input" name="cx" value="320.0" /></label>
+              <label class="field"><span class="field__label">cy（画面中心纵向像素）</span><input class="input" name="cy" value="240.0" /></label>
+              <label class="field"><span class="field__label">fx（相机横向焦距）</span><input class="input" name="fx" value="417.0467" /></label>
+              <label class="field"><span class="field__label">fy（相机纵向焦距）</span><input class="input" name="fy" value="461.0951" /></label>
+              <label class="field"><span class="field__label">resolution_（路径计算精度）</span><input class="input" name="resolution_" value="0.4" /></label>
+              <label class="field"><span class="field__label">max_jerk（加速度变化上限）</span><input class="input" name="max_jerk" value="0.5" /></label>
+              <label class="field"><span class="field__label">max_ydd（转向加速度上限）</span><input class="input" name="max_ydd" value="30.0" /></label>
+              <label class="field"><span class="field__label">drone_radius（无人机安全半径）</span><input class="input" name="drone_radius" value="0.3" /></label>
+              <label class="field"><span class="field__label">start_x（起始位置 X）</span><input class="input" name="start_x" value="0.0" /></label>
+              <label class="field"><span class="field__label">start_y（起始位置 Y）</span><input class="input" name="start_y" value="20.0" /></label>
+              <label class="field"><span class="field__label">start_z（起始位置 Z）</span><input class="input" name="start_z" value="-13.0" /></label>
+              <label class="field"><span class="field__label">viewpoint_dist（拍摄点间距）</span><input class="input" name="viewpoint_dist" value="8.0" /></label>
+              <label class="field"><span class="field__label">safe_radius（目标安全距离）</span><input class="input" name="safe_radius" value="3.0" /></label>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button id="startBtn" type="submit" class="btn btn--primary">开始运行</button>
+            <button id="stopBtn" type="button" class="btn btn--danger" disabled>终止运行</button>
+          </div>
+        </form>
+        <p id="hint" class="hint"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel__header">
+          <h2 class="panel__title">运行进度</h2>
+          <span id="phaseBadge" class="badge badge--idle">未开始</span>
+        </div>
+
+        <div class="status-line" id="statusLine">等待开始</div>
+        <div class="progress-wrap" aria-label="任务进度">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div class="progress-meta" id="progressMeta">阶段：未开始（总体 0%） | 已用时：00:00</div>
+
+        <div class="timeline-wrap">
+          <h3 class="sub-title">运行日志</h3>
+          <ul id="timeline" class="timeline"></ul>
+        </div>
+      </section>
+
+      <section class="panel" id="resultPanel">
+        <div class="panel__header">
+          <h2 class="panel__title">结果中心</h2>
+          <span class="panel__hint">先看关键数据，再按需生成视频</span>
+        </div>
+
+        <div id="metrics" class="metrics-wrap"></div>
+        <div id="artifacts" class="artifact-grid"></div>
+        <div id="downloads" class="downloads-wrap"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

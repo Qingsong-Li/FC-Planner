@@ -1,0 +1,94 @@
+@media (max-width: 1200px) {
+  .dashboard {
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--s-4);
+    padding: var(--s-4);
+  }
+
+  .artifact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field {
+    grid-column: span 4;
+  }
+
+  .config-main {
+    grid-template-columns: 1fr;
+  }
+
+  .model-preview-card {
+    position: static;
+  }
+}
+
+@media (max-width: 920px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--s-4);
+  }
+
+  .topbar__status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    order: 2;
+  }
+
+  .content {
+    order: 1;
+  }
+
+  .field {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 640px) {
+  .brand-title {
+    font-size: 18px;
+  }
+
+  .brand-subtitle {
+    font-size: 12px;
+  }
+
+  .panel {
+    padding: var(--s-4);
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .field {
+    grid-column: span 12;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .toast-container {
+    left: var(--s-3);
+    right: var(--s-3);
+    bottom: var(--s-3);
+  }
+
+  .toast {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+}

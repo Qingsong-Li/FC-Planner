@@ -1,19 +1,27 @@
-# FC-Planner 本地一键网页 V1
+# 无人机三维目标巡检视觉系统（本地 V1）
 
 ## 1. 目标
 
 `local_web_v1.py` 提供一个本地网页入口，支持：
 
-- 上传 `obj`
-- 填写核心参数
+- 上传 `OBJ`，可选上传 `MTL/材质文件`
+- 填写核心巡检参数
 - 一键触发：
-  1) `obj_to_pcd.py`
-  2) 生成 launch 并运行 FC-Planner
-  3) 自动发 ROS 触发消息（替代 RViz 的 `2D Nav Goal` 与 `2D Pose Estimate`）
-  4) 自动录制 RViz 飞行可视化视频（当 `ffmpeg` + `Xvfb` 或可用 `DISPLAY` 存在时）
-  4) 调 Blender 生成 FOV 帧
-  5) 若有 `ffmpeg`，自动合成 `mp4`
-- 页面轮询任务状态并展示结果链接
+  1) `obj_to_pcd.py` 模型点云转换
+  2) 动态生成 launch 并运行 FC-Planner 规划
+  3) 自动触发规划任务并等待轨迹结果
+  4) Blender 生成第三人称巡检视频（可选再生成 FOV 视频）
+  5) 自动合成 `mp4`
+- 运行中锁定上传和参数编辑
+- 支持“终止运行”
+- 页面只显示用户友好进度提示，不显示底层终端命令
+- 结果页展示视频与关键性能指标（不展示轨迹文本文件）
+- 结果页支持成果文件下载（可勾选下载）：
+  - `CloudInfo`：可见点云覆盖过程信息
+  - `PitchCoeff`：俯仰角系数
+  - `PositionCoeff`：三维位置系数
+  - `TrajInfo`：轨迹与姿态关键时序
+  - `YawCoeff`：偏航角系数
 
 ## 2. 运行方式
 
@@ -46,11 +54,10 @@ V1 脚本本身不依赖第三方 Python Web 框架（Flask/FastAPI 都不需要
 
 可选：
 
-- `ffmpeg`：优先用于把 Blender 输出的 `png` 合成 `mp4`
-- `Xvfb`：用于无头运行 RViz 并配合 ffmpeg 录屏（可选；有桌面 `DISPLAY` 时也可录）
+- `ffmpeg`：用于把 Blender 输出的 `png` 合成 `mp4`（推荐）
 
 说明：如果未安装 `ffmpeg`，当前版本会自动调用 Blender 脚本
-`FC-Planner/vis_tool/frames_to_video.py` 来合成 `fov.mp4`。
+`FC-Planner/vis_tool/frames_to_video.py` 合成视频。
 
 ## 4. 结果位置
 
@@ -62,13 +69,15 @@ V1 脚本本身不依赖第三方 Python Web 框架（Flask/FastAPI 都不需要
 
 通常包含：
 
-- `render_frames/*.png`
-- `fov.mp4`（优先 ffmpeg；无 ffmpeg 时自动改用 Blender 编码）
-- `rviz.mp4`（当 RViz 录屏条件满足时）
-- `TrajInfo_*.txt`
+- `third_person_frames/*.png`
+- `third_person.mp4`
+- `render_frames/*.png`（当开启 FOV 渲染时）
+- `fov.mp4`（当开启 FOV 渲染时）
+- `scene.log`（规划日志）
+- `internal.log`（内部命令日志，仅排障用）
 
 ## 5. 当前 V1 限制
 
-- RViz 视频录制依赖系统可用的 `ffmpeg`，且需要 `Xvfb` 或有效 `DISPLAY`
-- 任务串行执行，默认不支持并发
+- 默认串行执行，不支持并发任务
 - 参数白名单是当前表单字段，未覆盖 launch 全部参数
+- “已扫描区域实时高亮”仍在迭代中（当前版本重点是稳定流程与结果展示）

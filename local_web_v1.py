@@ -2,6 +2,7 @@
 import cgi
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -14,146 +15,73 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
-
 ROOT = Path(__file__).resolve().parent
 WS = ROOT / "FC-Planner"
-HCP_DIR = WS / "src" / "hierarchical_coverage_planner"
-DATA_DIR = HCP_DIR / "data"
-LAUNCH_DIR = HCP_DIR / "launch"
+LAUNCH_DIR = WS / "src" / "hierarchical_coverage_planner" / "launch"
 JOBS_DIR = ROOT / ".local_web_jobs"
+FRONTEND_DIR = ROOT / "frontend"
+PREVIEW_DIR = JOBS_DIR / "_preview"
 JOBS_DIR.mkdir(exist_ok=True)
-# 是否启用旧版 FOV 渲染流水线（render_in_traj.py）。
+PREVIEW_DIR.mkdir(exist_ok=True)
+
+# 是否启用第一视角(FOV)渲染链路（依赖 Blender；关闭可减少整体耗时）
 ENABLE_BLENDER_PIPELINE = False
-# 是否启用第三视角可视化流水线（render_third_person.py）。
-ENABLE_THIRD_PERSON_PIPELINE = True
-# 第三视角是否仅渲染预览图（单帧 preview.png）。True: 调机位快；False: 渲染完整视频。
+# 是否启用第三人称巡检视频渲染链路（推荐保持开启）
+ENABLE_THIRD_PERSON_PIPELINE = False
+# 第三人称仅渲染首帧预览图（调试视角时用；正式运行建议 False）
 THIRD_PERSON_PREVIEW_ONLY = False
-# 第三视角最大渲染帧数上限。0 表示不截断；>0 表示最多渲染前 N 帧。
+# 第三人称最多渲染帧数；0 表示不设上限
 THIRD_PERSON_MAX_FRAMES = 0
-# 第三视角全程重采样目标帧数（非截断）。
-# 例如原始 900 帧可均匀压缩到 600 帧，仍覆盖完整轨迹，但视频更短。
+# 对完整轨迹做均匀抽样后的目标帧数（用于压缩时长但保留全程）
 THIRD_PERSON_TARGET_FRAMES = 600
 
 
-HTML_INDEX = """<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FC-Planner V1 Local Runner</title>
-  <style>
-    body { font-family: sans-serif; margin: 24px; max-width: 980px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-    .row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; margin: 8px 0; }
-    input, button, textarea { padding: 8px; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    pre { background: #111; color: #ddd; padding: 10px; overflow: auto; border-radius: 8px; max-height: 360px; }
-    .ok { color: #0a7f2e; }
-    .err { color: #c62828; }
-    video { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
-  </style>
-</head>
-<body>
-  <h2>FC-Planner 一键本地演示（V1）</h2>
-  <div class="card">
-    <form id="jobForm" enctype="multipart/form-data">
-      <div class="row"><label>OBJ 文件</label><input type="file" name="obj_file" accept=".obj" required /></div>
-      <div class="row"><label>MTL/材质文件</label><input type="file" name="asset_files" multiple /></div>
-      <div class="row"><label>材质文件夹</label><input type="file" name="asset_dir_files" webkitdirectory directory multiple /></div>
-      <div class="row"><label>场景名(scene)</label><input name="scene_name" value="webscene" required /></div>
-      <div class="grid2">
-        <div class="row"><label>fov_h</label><input name="fov_h" value="55.0" /></div>
-        <div class="row"><label>fov_w</label><input name="fov_w" value="75.0" /></div>
-        <div class="row"><label>cx</label><input name="cx" value="320.0" /></div>
-        <div class="row"><label>cy</label><input name="cy" value="240.0" /></div>
-        <div class="row"><label>fx</label><input name="fx" value="417.0467" /></div>
-        <div class="row"><label>fy</label><input name="fy" value="461.0951" /></div>
-        <div class="row"><label>max_dist</label><input name="max_dist" value="11.0" /></div>
-        <div class="row"><label>resolution</label><input name="resolution_" value="0.4" /></div>
-        <div class="row"><label>max_vel</label><input name="max_vel" value="5.0" /></div>
-        <div class="row"><label>max_acc</label><input name="max_acc" value="1.0" /></div>
-        <div class="row"><label>max_jerk</label><input name="max_jerk" value="0.5" /></div>
-        <div class="row"><label>max_yd(deg/s)</label><input name="max_yd" value="60.0" /></div>
-        <div class="row"><label>max_ydd(deg/s²)</label><input name="max_ydd" value="30.0" /></div>
-        <div class="row"><label>drone_radius</label><input name="drone_radius" value="0.3" /></div>
-        <div class="row"><label>start_x</label><input name="start_x" value="0.0" /></div>
-        <div class="row"><label>start_y</label><input name="start_y" value="20.0" /></div>
-        <div class="row"><label>start_z</label><input name="start_z" value="-13.0" /></div>
-        <div class="row"><label>viewpoint_dist</label><input name="viewpoint_dist" value="8.0" /></div>
-        <div class="row"><label>safe_radius</label><input name="safe_radius" value="3.0" /></div>
-      </div>
-      <div class="row"><label>目标端口</label><input name="port" value="8008" /></div>
-      <div class="row"><label></label><button type="submit">一键开始</button></div>
-    </form>
-  </div>
-
-  <div class="card">
-    <div id="status">等待任务...</div>
-    <pre id="logs"></pre>
-    <div id="artifacts"></div>
-  </div>
-
-  <script>
-    let jobId = null;
-    let pollTimer = null;
-
-    async function pollStatus() {
-      if (!jobId) return;
-      const res = await fetch(`/api/status?job_id=${jobId}`);
-      const data = await res.json();
-      document.getElementById('status').innerHTML =
-        `任务: <b>${data.job_id}</b> | 状态: <b>${data.status}</b> | 阶段: ${data.phase || '-'}`;
-      document.getElementById('logs').textContent = (data.logs || []).join('\\n');
-      if (data.status === 'done' || data.status === 'failed') {
-        clearInterval(pollTimer);
-        const a = document.getElementById('artifacts');
-        a.innerHTML = '';
-        if (data.status === 'done') {
-          let html = '<p class="ok">任务完成</p>';
-          if (data.fov_video_url) {
-            html += `<h4>FOV 视频</h4><video controls src="${data.fov_video_url}"></video>`;
-          } else if (data.fov_frames_url) {
-            html += `<h4>FOV 帧目录</h4><a href="${data.fov_frames_url}" target="_blank">${data.fov_frames_url}</a>`;
-          }
-          if (data.third_person_video_url) {
-            html += `<h4>第三视角回放</h4><video controls src="${data.third_person_video_url}"></video>`;
-          }
-          if (data.third_person_preview_url) {
-            html += `<h4>第三视角预览</h4><img style="max-width:100%;border:1px solid #ddd;border-radius:8px" src="${data.third_person_preview_url}" />`;
-          }
-          if (data.traj_url) {
-            html += `<h4>轨迹文件</h4><a href="${data.traj_url}" target="_blank">${data.traj_url}</a>`;
-          }
-          a.innerHTML = html;
-        } else {
-          a.innerHTML = `<p class="err">任务失败：${data.error || 'unknown error'}</p>`;
-        }
-      }
-    }
-
-    document.getElementById('jobForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = document.getElementById('jobForm');
-      const fd = new FormData(form);
-      const res = await fetch('/api/start', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!data.ok) {
-        alert(data.error || '启动失败');
-        return;
-      }
-      jobId = data.job_id;
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(pollStatus, 1500);
-      pollStatus();
-    });
-  </script>
-</body>
-</html>
-"""
+@dataclass
+class Job:
+    job_id: str
+    status: str = "queued"  # queued/running/done/failed/canceled
+    phase: str = ""
+    public_status: str = "等待开始"
+    messages: List[str] = field(default_factory=list)
+    error: str = ""
+    warning: str = ""
+    fov_video_url: str = ""
+    third_person_video_url: str = ""
+    metrics: Dict[str, str] = field(default_factory=dict)
+    video_status: Dict[str, str] = field(default_factory=lambda: {"third_person": "idle", "fov": "idle"})
+    cancel_requested: bool = False
+    process_refs: List[subprocess.Popen] = field(default_factory=list)
+    raw_log_path: str = ""
+    scene_name: str = ""
 
 
-def run_cmd(cmd: str, logs: List[str], cwd: Optional[Path] = None, env: Optional[Dict[str, str]] = None) -> None:
-    logs.append(f"$ {cmd}")
+JOBS: Dict[str, Job] = {}
+LOCK = threading.Lock()
+
+
+def push_msg(job: Job, text: str) -> None:
+    job.messages.append(text)
+    if len(job.messages) > 200:
+        job.messages = job.messages[-200:]
+
+
+def set_phase(job: Job, phase: str, public_status: str, msg: Optional[str] = None) -> None:
+    job.phase = phase
+    job.public_status = public_status
+    if msg:
+        push_msg(job, msg)
+
+
+def check_cancel(job: Job) -> None:
+    if job.cancel_requested:
+        raise RuntimeError("任务已终止")
+
+
+def run_cmd(cmd: str, job: Job, cwd: Optional[Path] = None, env: Optional[Dict[str, str]] = None) -> None:
+    raw = Path(job.raw_log_path)
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    with raw.open("a", encoding="utf-8") as f:
+        f.write(f"\n$ {cmd}\n")
     p = subprocess.Popen(
         ["bash", "-lc", cmd],
         cwd=str(cwd) if cwd else None,
@@ -162,55 +90,85 @@ def run_cmd(cmd: str, logs: List[str], cwd: Optional[Path] = None, env: Optional
         stderr=subprocess.STDOUT,
         text=True,
     )
+    job.process_refs.append(p)
     assert p.stdout is not None
-    for line in p.stdout:
-        logs.append(line.rstrip())
+    with raw.open("a", encoding="utf-8", errors="ignore") as f:
+        for line in p.stdout:
+            f.write(line)
+            if job.cancel_requested:
+                p.terminate()
+                break
     code = p.wait()
     if code != 0:
-        raise RuntimeError(f"Command failed({code}): {cmd}")
+        raise RuntimeError(f"命令执行失败: {cmd}")
+
+
+def run_cmd_simple(cmd: str, cwd: Optional[Path] = None, env: Optional[Dict[str, str]] = None) -> str:
+    p = subprocess.run(
+        ["bash", "-lc", cmd],
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    out = p.stdout or ""
+    if p.returncode != 0:
+        raise RuntimeError((out[-600:] if out else "命令执行失败").strip())
+    return out
 
 
 def command_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-@dataclass
-class Job:
-    job_id: str
-    status: str = "queued"
-    phase: str = ""
-    logs: List[str] = field(default_factory=list)
-    error: str = ""
-    fov_video_url: str = ""
-    third_person_video_url: str = ""
-    third_person_preview_url: str = ""
-    fov_frames_url: str = ""
-    traj_url: str = ""
+def strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
-JOBS: Dict[str, Job] = {}
-LOCK = threading.Lock()
+def parse_metrics(scene_log: Path) -> Dict[str, str]:
+    if not scene_log.exists():
+        return {}
+    txt = strip_ansi(scene_log.read_text(errors="ignore").replace("\x00", ""))
+
+    def pick(pattern: str):
+        m = re.search(pattern, txt)
+        return m.group(1) if m else ""
+
+    metrics = {
+        "path_length_m": pick(r"path length = ([\d\.]+) m"),
+        "path_coverage_pct": pick(r"path coverage rate = ([\d\.]+) %"),
+        "traj_coverage_pct": pick(r"trajectory coverage rate = ([\d\.]+) %"),
+        "viewpoints_count": pick(r"all viewpoints quantity = (\d+)"),
+        "waypoints_count": pick(r"all waypoints quantity = (\d+)"),
+        "planning_latency_ms": pick(r"system computation latency = ([\d\.]+) ms"),
+        "traj_gen_latency_ms": pick(r"Trajectory Generation latency = ([\d\.]+) ms"),
+        "coverage_eval_s": pick(r"(?:path|trajectory) coverage evaluation time = ([\d\.]+) s"),
+        "traj_length_m": pick(r"traj length = ([\d\.]+) m"),
+        "traj_exec_time_s": pick(r"traj exec time = ([\d\.]+) s"),
+        "traj_max_vel_mps": pick(r"traj max vel = ([\d\.]+) m/s"),
+        "traj_max_acc_mps2": pick(r"traj max acc = ([\d\.]+) m/s\^2"),
+    }
+    return metrics
 
 
-def make_launch_from_eiffel(
-    form: Dict[str, str],
-    launch_out: Path,
-    mesh_path: Path,
-    pcd_path: Path,
-    fullcloud_path: Path,
-    traj_path: Path,
-    cloud_path: Path,
-    pos_path: Path,
-    pitch_path: Path,
-    yaw_path: Path,
-) -> None:
+def wait_metrics_ready(scene_log: Path, timeout_s: int = 180) -> None:
+    t0 = time.time()
+    while time.time() - t0 < timeout_s:
+        m = parse_metrics(scene_log)
+        # 至少拿到这三项再继续，避免前端指标空白
+        if m.get("path_coverage_pct") and m.get("path_length_m") and m.get("planning_latency_ms"):
+            return
+        time.sleep(1.0)
+
+
+def make_launch_from_eiffel(form: Dict[str, str], launch_out: Path, mesh_path: Path, pcd_path: Path, fullcloud_path: Path, traj_path: Path, cloud_path: Path, pos_path: Path, pitch_path: Path, yaw_path: Path) -> None:
     tpl = (LAUNCH_DIR / "eiffeltower.launch").read_text(encoding="utf-8")
 
     def rp(old: str, new: str) -> None:
         nonlocal tpl
         tpl = tpl.replace(old, new)
 
-    # Keep all defaults aligned with eiffeltower.launch except paths and user-adjustable fields.
     rp('name="fov_h" value="55.0"', f'name="fov_h" value="{form["fov_h"]}"')
     rp('name="fov_w" value="75.0"', f'name="fov_w" value="{form["fov_w"]}"')
     rp('name="cx" value="320.0"', f'name="cx" value="{form["cx"]}"')
@@ -231,7 +189,6 @@ def make_launch_from_eiffel(
     rp('name="viewpoint_manager/viewpoints_distance" value="8.0"', f'name="viewpoint_manager/viewpoints_distance" value="{form["viewpoint_dist"]}"')
     rp('name="viewpoint_manager/safe_radius" value="3.0"', f'name="viewpoint_manager/safe_radius" value="{form["safe_radius"]}"')
 
-    # Route all data IO to local job directory, not FC-Planner workspace.
     rp('value="$(find hierarchical_coverage_planner)/data/EiffelTower.pcd"', f'value="{pcd_path}"')
     rp('value="$(find hierarchical_coverage_planner)/data/mesh/EiffelTower.obj"', f'value="{mesh_path}"')
     rp('value="$(find hierarchical_coverage_planner)/data/EiffelTowermore.pcd"', f'value="{fullcloud_path}"')
@@ -244,34 +201,25 @@ def make_launch_from_eiffel(
     launch_out.write_text(tpl, encoding="utf-8")
 
 
-def _safe_rel_path(p: str) -> Path:
-    rel = Path(p.replace("\\", "/"))
-    cleaned = Path(*[x for x in rel.parts if x not in ("", ".", "..")])
-    if str(cleaned) == "":
-        raise RuntimeError("empty relative path for uploaded asset")
-    return cleaned
-
-
 def run_job(job: Job, form: Dict[str, str], obj_uploaded_path: Path, asset_uploaded_paths: List[Path]) -> None:
     scene_proc = None
+    scene_out = None
     ros_env = os.environ.copy()
-    # Avoid ROS1 Noetic EOL popup blocking RViz in headless recording.
     ros_env["DISABLE_ROS1_EOL_WARNINGS"] = "1"
+
     try:
         job.status = "running"
-        scene = form["scene_name"].strip()
+        set_phase(job, "prepare", "正在准备任务…", "已收到任务，开始准备环境。")
+
+        scene = "".join(ch for ch in form["scene_name"].strip() if ch.isalnum() or ch in ("_", "-")).strip("_-")
         if not scene:
-            raise RuntimeError("scene_name is empty")
-        safe_scene = "".join(ch for ch in scene if ch.isalnum() or ch in ("_", "-")).strip("_-")
-        if not safe_scene:
-            raise RuntimeError("scene_name only has invalid chars")
-        scene = safe_scene
+            raise RuntimeError("场景名称无效")
+        job.scene_name = scene
 
         job_dir = JOBS_DIR / job.job_id
-        render_dir = job_dir / "render_frames"
-        render_dir.mkdir(parents=True, exist_ok=True)
+        scene_log = job_dir / "scene.log"
+        job.raw_log_path = str(job_dir / "internal.log")
 
-        job.phase = "prepare-files"
         mesh_dst = job_dir / f"{scene}.obj"
         pcd_dst = job_dir / f"{scene}.pcd"
         fullcloud_dst = job_dir / f"{scene}more.pcd"
@@ -280,199 +228,224 @@ def run_job(job: Job, form: Dict[str, str], obj_uploaded_path: Path, asset_uploa
         pos_path = job_dir / f"PositionCoeff_{scene}.txt"
         pitch_path = job_dir / f"PitchCoeff_{scene}.txt"
         yaw_path = job_dir / f"YawCoeff_{scene}.txt"
-        shutil.copy2(obj_uploaded_path, mesh_dst)
-        job.logs.append(f"[INFO] OBJ copied: {mesh_dst}")
-        if asset_uploaded_paths:
-            copied = 0
-            for src in asset_uploaded_paths:
-                if src.exists():
-                    if src.resolve() == mesh_dst.resolve():
-                        continue
-                    dst = job_dir / src.name
-                    if src.resolve() != dst.resolve():
-                        shutil.copy2(src, dst)
-                    copied += 1
-            job.logs.append(f"[INFO] Asset files copied: {copied}")
-        else:
-            job.logs.append("[WARN] No MTL/texture assets uploaded; rendered material may be incomplete.")
 
-        job.phase = "obj-to-pcd"
+        shutil.copy2(obj_uploaded_path, mesh_dst)
+        for src in asset_uploaded_paths:
+            if src.exists() and src.resolve() != mesh_dst.resolve():
+                dst = job_dir / src.name
+                if src.resolve() != dst.resolve():
+                    shutil.copy2(src, dst)
+
+        check_cancel(job)
+        set_phase(job, "convert", "正在处理模型文件…", "正在把三维模型整理成可计算格式。")
         run_cmd(
             "python3 obj_to_pcd.py "
-            f"--obj '{mesh_dst}' "
-            f"--out-prefix '{scene}' "
-            f"--out-dir '{job_dir}' "
+            f"--obj '{mesh_dst}' --out-prefix '{scene}' --out-dir '{job_dir}' "
             "--full-points 500000 --rosa-voxel 0.05 --rosa-max-points 120000",
-            job.logs,
+            job,
             cwd=ROOT,
         )
-        src_rosa = job_dir / f"{scene}_rosa.pcd"
-        src_full = job_dir / f"{scene}_fullcloud.pcd"
-        shutil.move(str(src_rosa), str(pcd_dst))
-        shutil.move(str(src_full), str(fullcloud_dst))
-        job.logs.append(f"[INFO] PCD ready: {pcd_dst}, {fullcloud_dst}")
+        shutil.move(str(job_dir / f"{scene}_rosa.pcd"), str(pcd_dst))
+        shutil.move(str(job_dir / f"{scene}_fullcloud.pcd"), str(fullcloud_dst))
 
-        job.phase = "build-launch"
+        check_cancel(job)
+        set_phase(job, "planning", "正在规划巡检路线…", "系统正在计算巡检路线和飞行策略。")
         launch_file = job_dir / f"web_{scene}.launch"
-        make_launch_from_eiffel(
-            form=form,
-            launch_out=launch_file,
-            mesh_path=mesh_dst,
-            pcd_path=pcd_dst,
-            fullcloud_path=fullcloud_dst,
-            traj_path=traj_path,
-            cloud_path=cloud_path,
-            pos_path=pos_path,
-            pitch_path=pitch_path,
-            yaw_path=yaw_path,
-        )
-        job.logs.append(f"[INFO] Launch generated: {launch_file}")
+        make_launch_from_eiffel(form, launch_file, mesh_dst, pcd_dst, fullcloud_dst, traj_path, cloud_path, pos_path, pitch_path, yaw_path)
 
-        job.phase = "ros-launch"
-        scene_log = job_dir / "scene.log"
-        scene_cmd = (
-            f"cd '{WS}' && source devel/setup.bash && "
-            f"roslaunch '{launch_file}'"
-        )
+        scene_cmd = f"cd '{WS}' && source devel/setup.bash && roslaunch '{launch_file}'"
         scene_out = scene_log.open("w", encoding="utf-8")
         scene_proc = subprocess.Popen(["bash", "-lc", scene_cmd], stdout=scene_out, stderr=scene_out, env=ros_env)
-        job.logs.append("[INFO] Scene launch started, waiting for nodes...")
-        time.sleep(10.0)
+        job.process_refs.append(scene_proc)
+        time.sleep(8.0)
 
-        job.phase = "trigger-planning"
         trigger_goal = (
-            "source devel/setup.bash && "
-            "rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped "
-            "\"{header: {frame_id: 'world'}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, "
-            "orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}\""
+            "source devel/setup.bash && rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped "
+            "\"{header: {frame_id: 'world'}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}\""
         )
-        run_cmd(f"cd '{WS}' && {trigger_goal}", job.logs, env=ros_env)
-        job.logs.append("[INFO] Planning trigger sent (/move_base_simple/goal).")
+        run_cmd(f"cd '{WS}' && {trigger_goal}", job, env=ros_env)
 
         timeout_s = 1800
         t0 = time.time()
-        job.phase = "wait-traj"
         while True:
-            if traj_path.exists() and traj_path.stat().st_size > 0:
+            check_cancel(job)
+            if traj_path.exists() and traj_path.stat().st_size > 0 and cloud_path.exists() and cloud_path.stat().st_size > 0:
                 break
             if time.time() - t0 > timeout_s:
-                raise RuntimeError(f"Trajectory output timeout: {traj_path}")
-            time.sleep(2.0)
-        job.logs.append(f"[INFO] Traj generated: {traj_path}")
+                raise RuntimeError("规划超时，请尝试简化模型或参数")
+            time.sleep(1.5)
 
-        job.phase = "wait-cloud"
-        t1 = time.time()
-        while True:
-            if cloud_path.exists() and cloud_path.stat().st_size > 0:
-                break
-            if time.time() - t1 > timeout_s:
-                raise RuntimeError(f"Cloud output timeout: {cloud_path}")
-            time.sleep(1.0)
-        job.logs.append(f"[INFO] Cloud generated: {cloud_path}")
+        # 等待关键指标写入日志，避免结果页“关键数据为空”
+        set_phase(job, "metrics", "正在整理结果数据…", "正在汇总本次巡检的关键结果。")
+        wait_metrics_ready(scene_log, timeout_s=180)
 
-        if ENABLE_THIRD_PERSON_PIPELINE:
-            job.phase = "third-person-render"
-            if not command_exists("blender"):
-                raise RuntimeError("blender not found in PATH.")
-            third_frames = job_dir / "third_person_frames"
-            third_frames.mkdir(parents=True, exist_ok=True)
-            third_video = job_dir / "third_person.mp4"
-            drone_model = WS / "src" / "traj_utils" / "f250.dae"
-
-            third_cmd = (
-                f"blender --background --python '{WS / 'vis_tool' / 'render_third_person.py'}' -- "
-                f"--scene_model_path '{mesh_dst}' "
-                f"--drone_model_path '{drone_model}' "
-                f"--traj_path '{traj_path}' "
-                f"--cloud_path '{cloud_path}' "
-                f"--renderout_path '{third_frames}' "
-                f"--fps 20 --sample_step 5 --max_frames {THIRD_PERSON_MAX_FRAMES} --target_frames {THIRD_PERSON_TARGET_FRAMES} "
-                + ("--preview_only" if THIRD_PERSON_PREVIEW_ONLY else "")
-            )
-            run_cmd(third_cmd, job.logs)
-
-            if THIRD_PERSON_PREVIEW_ONLY:
-                preview_png = third_frames / "preview.png"
-                if preview_png.exists() and preview_png.stat().st_size > 0:
-                    job.third_person_preview_url = f"/artifacts/{job.job_id}/third_person_frames/preview.png"
-                else:
-                    job.logs.append("[WARN] Third-person preview not generated.")
-            else:
-                if command_exists("ffmpeg"):
-                    job.phase = "third-person-encode"
-                    third_encode_cmd = (
-                        f"ffmpeg -y -framerate 20 -pattern_type glob -i '{third_frames}/*.png' "
-                        f"-c:v libx264 -pix_fmt yuv420p '{third_video}'"
-                    )
-                    run_cmd(third_encode_cmd, job.logs)
-                else:
-                    job.phase = "third-person-encode-blender"
-                    third_encode_cmd = (
-                        f"blender --background --python '{WS / 'vis_tool' / 'frames_to_video.py'}' -- "
-                        f"--frames_dir '{third_frames}' --output '{third_video}' --fps 20"
-                    )
-                    run_cmd(third_encode_cmd, job.logs)
-
-                if third_video.exists() and third_video.stat().st_size > 0:
-                    job.third_person_video_url = f"/artifacts/{job.job_id}/third_person.mp4"
-                else:
-                    job.logs.append("[WARN] Third-person video not generated.")
-        else:
-            job.logs.append("[INFO] Third-person blender replay disabled.")
-
-        if ENABLE_BLENDER_PIPELINE:
-            job.phase = "blender-render"
-            if not command_exists("blender"):
-                raise RuntimeError("blender not found in PATH.")
-
-            render_cmd = (
-                f"blender --background --python '{WS / 'vis_tool' / 'render_in_traj.py'}' -- "
-                f"--model_path '{mesh_dst}' "
-                f"--traj_path '{traj_path}' "
-                f"--renderout_path '{render_dir}' "
-                "--backend BLENDER_EEVEE --fast_mode"
-            )
-            run_cmd(render_cmd, job.logs)
-
-            fov_video = job_dir / "fov.mp4"
-            if command_exists("ffmpeg"):
-                job.phase = "fov-encode"
-                encode_cmd = (
-                    f"ffmpeg -y -framerate 20 -i '{render_dir}/%04d.png' "
-                    f"-c:v libx264 -pix_fmt yuv420p '{fov_video}'"
-                )
-                run_cmd(encode_cmd, job.logs)
-                job.fov_video_url = f"/artifacts/{job.job_id}/fov.mp4"
-            else:
-                job.phase = "fov-encode-blender"
-                job.logs.append("[WARN] ffmpeg missing, using Blender to encode FOV video.")
-                blender_encode_cmd = (
-                    f"blender --background --python '{WS / 'vis_tool' / 'frames_to_video.py'}' -- "
-                    f"--frames_dir '{render_dir}' --output '{fov_video}' --fps 20"
-                )
-                run_cmd(blender_encode_cmd, job.logs)
-                if fov_video.exists() and fov_video.stat().st_size > 0:
-                    job.fov_video_url = f"/artifacts/{job.job_id}/fov.mp4"
-                else:
-                    job.logs.append("[WARN] Blender encode did not produce mp4, output png frames only.")
-                    job.fov_frames_url = f"/artifacts/{job.job_id}/render_frames/"
-        else:
-            job.logs.append("[INFO] Blender pipeline disabled. Skip FOV rendering/encoding.")
-
-        traj_copy = job_dir / traj_path.name
-        if traj_path.resolve() != traj_copy.resolve():
-            shutil.copy2(traj_path, traj_copy)
-        job.traj_url = f"/artifacts/{job.job_id}/{traj_copy.name}"
-
-        job.phase = "done"
+        job.metrics = parse_metrics(scene_log)
+        set_phase(job, "done", "任务完成", "关键数据已生成，可按需生成可视化视频。")
         job.status = "done"
     except Exception as e:
-        job.status = "failed"
-        job.error = str(e)
-        job.logs.append(f"[ERROR] {e}")
+        if job.cancel_requested:
+            job.status = "canceled"
+            set_phase(job, "canceled", "任务已终止", "已按你的要求终止任务。")
+        else:
+            job.status = "failed"
+            job.error = str(e)
+            set_phase(job, "failed", "任务执行失败", "任务执行中断，请稍后重试。")
     finally:
         if scene_proc and scene_proc.poll() is None:
             scene_proc.terminate()
+        if scene_out is not None:
+            scene_out.flush()
+            scene_out.close()
+
+
+def get_running_job() -> Optional[Job]:
+    with LOCK:
+        for j in JOBS.values():
+            if j.status in ("queued", "running"):
+                return j
+    return None
+
+
+def render_video(job: Job, video_type: str) -> None:
+    job_dir = JOBS_DIR / job.job_id
+    scene = job.scene_name
+    mesh_dst = job_dir / f"{scene}.obj"
+    traj_path = job_dir / f"TrajInfo_{scene}.txt"
+    cloud_path = job_dir / f"CloudInfo_{scene}.txt"
+    if not mesh_dst.exists() or not traj_path.exists():
+        raise RuntimeError("缺少渲染所需文件")
+
+    if video_type == "third_person":
+        third_frames = job_dir / "third_person_frames"
+        third_frames.mkdir(parents=True, exist_ok=True)
+        third_video = job_dir / "third_person.mp4"
+        drone_model = WS / "src" / "traj_utils" / "f250.dae"
+        run_cmd(
+            f"blender --background --python '{WS / 'vis_tool' / 'render_third_person.py'}' -- "
+            f"--scene_model_path '{mesh_dst}' --drone_model_path '{drone_model}' "
+            f"--traj_path '{traj_path}' --cloud_path '{cloud_path}' --renderout_path '{third_frames}' "
+            f"--fps 20 --sample_step 5 --max_frames {THIRD_PERSON_MAX_FRAMES} --target_frames {THIRD_PERSON_TARGET_FRAMES} "
+            + ("--preview_only" if THIRD_PERSON_PREVIEW_ONLY else ""),
+            job,
+        )
+        if command_exists("ffmpeg"):
+            run_cmd(
+                f"ffmpeg -y -framerate 20 -pattern_type glob -i '{third_frames}/*.png' -c:v libx264 -pix_fmt yuv420p '{third_video}'",
+                job,
+            )
+        else:
+            run_cmd(
+                f"blender --background --python '{WS / 'vis_tool' / 'frames_to_video.py'}' -- --frames_dir '{third_frames}' --output '{third_video}' --fps 20",
+                job,
+            )
+        if third_video.exists() and third_video.stat().st_size > 0:
+            job.third_person_video_url = f"/artifacts/{job.job_id}/third_person.mp4"
+        else:
+            raise RuntimeError("第三人称视频生成失败")
+    elif video_type == "fov":
+        fov_frames = job_dir / "render_frames"
+        fov_video = job_dir / "fov.mp4"
+        run_cmd(
+            f"blender --background --python '{WS / 'vis_tool' / 'render_in_traj.py'}' -- --model_path '{mesh_dst}' --traj_path '{traj_path}' --renderout_path '{fov_frames}' --backend BLENDER_EEVEE --fast_mode",
+            job,
+        )
+        if command_exists("ffmpeg"):
+            run_cmd(f"ffmpeg -y -framerate 20 -i '{fov_frames}/%04d.png' -c:v libx264 -pix_fmt yuv420p '{fov_video}'", job)
+        else:
+            run_cmd(
+                f"blender --background --python '{WS / 'vis_tool' / 'frames_to_video.py'}' -- --frames_dir '{fov_frames}' --output '{fov_video}' --fps 20",
+                job,
+            )
+        if fov_video.exists() and fov_video.stat().st_size > 0:
+            job.fov_video_url = f"/artifacts/{job.job_id}/fov.mp4"
+        else:
+            raise RuntimeError("FOV视频生成失败")
+    else:
+        raise RuntimeError("未知视频类型")
+
+
+def run_render_video(job: Job, video_type: str) -> None:
+    try:
+        job.video_status[video_type] = "running"
+        if video_type == "third_person":
+            set_phase(job, "render_third_person", "正在生成第三人称视频…", "已开始生成第三人称视频。")
+        else:
+            set_phase(job, "render_fov", "正在生成无人机FOV视频…", "已开始生成无人机FOV视频。")
+        render_video(job, video_type)
+        job.video_status[video_type] = "done"
+        set_phase(job, "done", "任务完成", "视频生成完成。")
+    except Exception as e:
+        job.video_status[video_type] = "failed"
+        job.error = str(e)
+        set_phase(job, "done", "任务完成", "视频生成失败，请重试。")
+
+
+def build_result_files(job: Job) -> List[Dict[str, str]]:
+    if not job.scene_name:
+        return []
+    job_dir = JOBS_DIR / job.job_id
+    scene = job.scene_name
+    specs = [
+        ("cloud_info", f"CloudInfo_{scene}.txt", "CloudInfo", "巡检过程中每个时刻可见点云信息，用于分析覆盖过程。"),
+        ("pitch_coeff", f"PitchCoeff_{scene}.txt", "PitchCoeff", "相机/机体俯仰角系数，描述姿态随时间变化。"),
+        ("position_coeff", f"PositionCoeff_{scene}.txt", "PositionCoeff", "无人机三维位置轨迹系数，用于还原飞行路径。"),
+        ("traj_info", f"TrajInfo_{scene}.txt", "TrajInfo", "轨迹关键时间序列与姿态信息，是回放与渲染的核心输入。"),
+        ("yaw_coeff", f"YawCoeff_{scene}.txt", "YawCoeff", "偏航角系数，描述朝向随时间变化。"),
+    ]
+    out: List[Dict[str, str]] = []
+    for key, filename, label, desc in specs:
+        p = job_dir / filename
+        if p.exists() and p.stat().st_size > 0:
+            out.append({
+                "key": key,
+                "label": label,
+                "filename": filename,
+                "desc": desc,
+                "size_bytes": str(p.stat().st_size),
+                "url": f"/artifacts/{job.job_id}/{filename}",
+            })
+    return out
+
+
+def build_obj_preview(obj_field, asset_fields: List) -> Dict[str, str]:
+    if not getattr(obj_field, "file", None) or not obj_field.filename:
+        raise RuntimeError("请先上传 OBJ 文件")
+
+    preview_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+    preview_job_dir = PREVIEW_DIR / preview_id
+    preview_job_dir.mkdir(parents=True, exist_ok=True)
+
+    obj_name = Path(obj_field.filename.replace("\\", "/")).name
+    if not obj_name.lower().endswith(".obj"):
+        obj_name = "upload.obj"
+    obj_path = preview_job_dir / obj_name
+    with obj_path.open("wb") as f:
+        shutil.copyfileobj(obj_field.file, f)
+
+    for af in asset_fields:
+        if not getattr(af, "file", None) or not af.filename:
+            continue
+        name = Path(af.filename.replace("\\", "/")).name
+        if not name:
+            continue
+        with (preview_job_dir / name).open("wb") as f:
+            shutil.copyfileobj(af.file, f)
+
+    preview_png = preview_job_dir / "preview.png"
+    if not command_exists("blender"):
+        raise RuntimeError("本机未检测到 blender，无法生成模型快照")
+    run_cmd_simple(
+        f"blender --background --python '{WS / 'vis_tool' / 'render_model_snapshot.py'}' -- "
+        f"--model_path '{obj_path}' --output_path '{preview_png}' --width 1280 --height 720 --samples 8",
+        cwd=ROOT,
+    )
+    if not preview_png.exists() or preview_png.stat().st_size == 0:
+        raise RuntimeError("模型快照生成失败")
+
+    return {
+        "preview_url": f"/artifacts/_preview/{preview_id}/preview.png",
+        "model_name": Path(obj_name).stem,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -487,12 +460,31 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/":
-            body = HTML_INDEX.encode("utf-8")
-            self.send_response(HTTPStatus.OK)
+            data = (FRONTEND_DIR / "index.html").read_bytes()
+            self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(body)
+            self.wfile.write(data)
+            return
+
+        if parsed.path.startswith("/static/"):
+            rel = parsed.path[len("/static/"):]
+            file = (FRONTEND_DIR / rel).resolve()
+            if not str(file).startswith(str(FRONTEND_DIR.resolve())) or not file.exists():
+                self.send_error(404)
+                return
+            data = file.read_bytes()
+            ctype = "text/plain"
+            if file.suffix == ".css":
+                ctype = "text/css"
+            elif file.suffix == ".js":
+                ctype = "application/javascript"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         if parsed.path == "/api/status":
@@ -503,52 +495,39 @@ class Handler(BaseHTTPRequestHandler):
             if not job:
                 self._json({"ok": False, "error": "job not found"}, 404)
                 return
-            self._json(
-                {
-                    "ok": True,
-                    "job_id": job.job_id,
-                    "status": job.status,
-                    "phase": job.phase,
-                    "logs": job.logs[-300:],
-                    "error": job.error,
-                    "fov_video_url": job.fov_video_url,
-                    "fov_frames_url": job.fov_frames_url,
-                    "traj_url": job.traj_url,
-                    "third_person_video_url": job.third_person_video_url,
-                    "third_person_preview_url": job.third_person_preview_url,
-                }
-            )
+            # 兜底：任务结束后若内存指标为空，按需从 scene.log 回填，避免页面显示全 "-"
+            if job.status in ("done", "failed", "canceled"):
+                scene_log = JOBS_DIR / job.job_id / "scene.log"
+                refreshed = parse_metrics(scene_log)
+                if any(v for v in refreshed.values()):
+                    job.metrics = refreshed
+            self._json({
+                "ok": True,
+                "job_id": job.job_id,
+                "status": job.status,
+                "phase": job.phase,
+                "public_status": job.public_status,
+                "messages": job.messages[-80:],
+                "error": job.error,
+                "warning": job.warning,
+                "third_person_video_url": job.third_person_video_url,
+                "fov_video_url": job.fov_video_url,
+                "metrics": job.metrics,
+                "video_status": job.video_status,
+                "result_files": build_result_files(job),
+            })
             return
 
         if parsed.path.startswith("/artifacts/"):
             rel = parsed.path[len("/artifacts/"):].lstrip("/")
             local = (JOBS_DIR / rel).resolve()
-            if not str(local).startswith(str(JOBS_DIR.resolve())):
-                self.send_error(403)
-                return
-            if local.is_dir():
-                items = sorted(local.iterdir())
-                lines = [f"<h3>{local.name}</h3><ul>"]
-                for p in items:
-                    href = parsed.path.rstrip("/") + "/" + p.name
-                    lines.append(f'<li><a href="{href}">{p.name}</a></li>')
-                lines.append("</ul>")
-                body = "\n".join(lines).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
-            if not local.exists():
+            if not str(local).startswith(str(JOBS_DIR.resolve())) or not local.exists():
                 self.send_error(404)
                 return
             data = local.read_bytes()
             ctype = "application/octet-stream"
             if local.suffix == ".mp4":
                 ctype = "video/mp4"
-            elif local.suffix == ".txt":
-                ctype = "text/plain; charset=utf-8"
             elif local.suffix == ".png":
                 ctype = "image/png"
             self.send_response(200)
@@ -562,9 +541,90 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+
+        if parsed.path == "/api/preview_obj":
+            fs = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={
+                    "REQUEST_METHOD": "POST",
+                    "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+                    "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+                },
+            )
+            if "obj_file" not in fs:
+                self._json({"ok": False, "error": "请先上传 OBJ 文件。"}, 400)
+                return
+            obj_field = fs["obj_file"]
+            upload_fields = []
+            if "asset_files" in fs:
+                upload_fields.append(fs["asset_files"])
+            if "asset_dir_files" in fs:
+                upload_fields.append(fs["asset_dir_files"])
+            assets = []
+            for item in upload_fields:
+                assets.extend(item if isinstance(item, list) else [item])
+            try:
+                info = build_obj_preview(obj_field, assets)
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)}, 500)
+                return
+            self._json({"ok": True, **info})
+            return
+
+        if parsed.path == "/api/cancel":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(body)
+            job_id = payload.get("job_id", "")
+            with LOCK:
+                job = JOBS.get(job_id)
+            if not job:
+                self._json({"ok": False, "error": "job not found"}, 404)
+                return
+            job.cancel_requested = True
+            for p in list(job.process_refs):
+                try:
+                    if p.poll() is None:
+                        p.terminate()
+                except Exception:
+                    pass
+            self._json({"ok": True})
+            return
+
+        if parsed.path == "/api/render_video":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(body)
+            job_id = payload.get("job_id", "")
+            video_type = payload.get("video_type", "")
+            if video_type not in ("third_person", "fov"):
+                self._json({"ok": False, "error": "video_type 必须是 third_person 或 fov"}, 400)
+                return
+            with LOCK:
+                job = JOBS.get(job_id)
+            if not job:
+                self._json({"ok": False, "error": "job not found"}, 404)
+                return
+            if job.status != "done":
+                self._json({"ok": False, "error": "请等待主任务完成后再生成视频。"}, 409)
+                return
+            if job.video_status.get(video_type) == "running":
+                self._json({"ok": False, "error": "该视频正在生成中。"}, 409)
+                return
+            t = threading.Thread(target=run_render_video, args=(job, video_type), daemon=True)
+            t.start()
+            self._json({"ok": True})
+            return
+
         if parsed.path != "/api/start":
             self.send_error(404)
             return
+
+        if get_running_job() is not None:
+            self._json({"ok": False, "error": "当前已有任务运行，请先等待结束或点击终止。"}, 409)
+            return
+
         fs = cgi.FieldStorage(
             fp=self.rfile,
             headers=self.headers,
@@ -574,23 +634,20 @@ class Handler(BaseHTTPRequestHandler):
                 "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
             },
         )
+
         if "obj_file" not in fs:
-            self._json({"ok": False, "error": "missing obj_file"}, 400)
+            self._json({"ok": False, "error": "请先上传 OBJ 文件。"}, 400)
             return
 
         obj_field = fs["obj_file"]
-        if not getattr(obj_field, "file", None):
-            self._json({"ok": False, "error": "invalid obj_file"}, 400)
+        if not getattr(obj_field, "file", None) or not obj_field.filename:
+            self._json({"ok": False, "error": "请先上传 OBJ 文件。"}, 400)
             return
 
         form = {}
-        keys = [
-            "scene_name", "fov_h", "fov_w", "cx", "cy", "fx", "fy", "max_dist", "resolution_",
-            "max_vel", "max_acc", "max_jerk", "max_yd", "max_ydd", "drone_radius",
-            "start_x", "start_y", "start_z", "viewpoint_dist", "safe_radius",
-        ]
+        keys = ["scene_name", "fov_h", "fov_w", "cx", "cy", "fx", "fy", "max_dist", "resolution_", "max_vel", "max_acc", "max_jerk", "max_yd", "max_ydd", "drone_radius", "start_x", "start_y", "start_z", "viewpoint_dist", "safe_radius"]
         for k in keys:
-            form[k] = fs.getvalue(k, "").strip()
+            form[k] = fs.getvalue(k, "").strip() or "0"
 
         job_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
         job_dir = JOBS_DIR / job_id
@@ -610,42 +667,36 @@ class Handler(BaseHTTPRequestHandler):
             upload_fields.append(fs["asset_files"])
         if "asset_dir_files" in fs:
             upload_fields.append(fs["asset_dir_files"])
-
         if upload_fields:
             assets = []
             for item in upload_fields:
-                if isinstance(item, list):
-                    assets.extend(item)
-                else:
-                    assets.append(item)
-            for i, af in enumerate(assets):
-                if not getattr(af, "file", None):
+                assets.extend(item if isinstance(item, list) else [item])
+            for af in assets:
+                if not getattr(af, "file", None) or not af.filename:
                     continue
-                if not af.filename:
+                rel = Path(af.filename.replace("\\", "/")).name
+                if not rel:
                     continue
-                rel_name = af.filename.replace("\\", "/")
-                safe_name = Path(rel_name).name
-                if not safe_name:
-                    continue
-                rel = _safe_rel_path(rel_name)
                 dst = uploads_dir / rel
-                dst.parent.mkdir(parents=True, exist_ok=True)
                 with dst.open("wb") as f:
                     shutil.copyfileobj(af.file, f)
                 asset_uploaded_paths.append(dst)
 
         job = Job(job_id=job_id)
+        if not asset_uploaded_paths:
+            job.warning = "未上传材质文件，可能影响无人机FOV视频显示效果。"
+
         with LOCK:
             JOBS[job_id] = job
         t = threading.Thread(target=run_job, args=(job, form, obj_uploaded, asset_uploaded_paths), daemon=True)
         t.start()
-        self._json({"ok": True, "job_id": job_id})
+        self._json({"ok": True, "job_id": job_id, "warning": job.warning})
 
 
 def main() -> None:
     port = int(os.environ.get("FC_WEB_PORT", "8008"))
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"[INFO] FC-Planner local web V1 running: http://127.0.0.1:{port}")
+    print(f"[INFO] 无人机三维目标巡检视觉系统: http://127.0.0.1:{port}")
     srv.serve_forever()
 
 

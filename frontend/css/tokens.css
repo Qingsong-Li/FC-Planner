@@ -1,0 +1,53 @@
+:root {
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+
+  --bg-0: #f3f7ff;
+  --bg-1: #ffffff;
+  --bg-2: #f8faff;
+  --bg-glass: rgba(255, 255, 255, 0.68);
+
+  --text-1: #0f172a;
+  --text-2: #334155;
+  --text-3: #64748b;
+
+  --brand-500: #2563eb;
+  --brand-600: #1d4ed8;
+  --brand-100: #dbeafe;
+
+  --ok-500: #16a34a;
+  --ok-100: #dcfce7;
+  --warn-500: #d97706;
+  --warn-100: #ffedd5;
+  --danger-500: #dc2626;
+  --danger-100: #fee2e2;
+
+  --line-1: #dbe4f3;
+  --line-2: #e6edf8;
+
+  --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.1);
+
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+
+  --fz-xs: 12px;
+  --fz-sm: 13px;
+  --fz-md: 14px;
+  --fz-lg: 16px;
+  --fz-xl: 20px;
+  --fz-2xl: 28px;
+
+  --t-fast: 160ms;
+  --t-mid: 260ms;
+}
